@@ -942,35 +942,33 @@ class Datatables
         }
 
         // if its a normal query ( no union ) replace the select with static text to improve performance
+        // if query has no "having" clause add select columns
         $countQuery = clone $query;
-        if (!preg_match('/UNION/i', $countQuery->toSql())) {
+        if (!preg_match('/UNION/i', $countQuery->toSql()) && !$countQuery->havings) {
             $countQuery->select(DB::raw("'1' as row"));
 
-            // if query has "having" clause add select columns
-            if ($countQuery->havings) {
-                foreach ($countQuery->havings as $having) {
-                    if (isset($having['column'])) {
-                        $countQuery->addSelect($having['column']);
-                    } else {
-                        // search filter_columns for query string to get column name from an array key
-                        $found = false;
-                        foreach ($this->filter_columns as $column => $filter) {
-                            if ($filter['parameters'][0] == $having['sql']) {
-                                $found = $column;
+            foreach ($countQuery->havings as $having) {
+                if (isset($having['column'])) {
+                    $countQuery->addSelect($having['column']);
+                } else {
+                    // search filter_columns for query string to get column name from an array key
+                    $found = false;
+                    foreach ($this->filter_columns as $column => $filter) {
+                        if ($filter['parameters'][0] == $having['sql']) {
+                            $found = $column;
+                            break;
+                        }
+                    }
+                    // then correct it if it's an alias and add to columns
+                    if ($found !== false) {
+                        foreach ($this->columns as $col) {
+                            $arr = preg_split('/ as /i', $col);
+                            if (isset($arr[1]) && $arr[1] == $found) {
+                                $found = $arr[0];
                                 break;
                             }
                         }
-                        // then correct it if it's an alias and add to columns
-                        if ($found !== false) {
-                            foreach ($this->columns as $col) {
-                                $arr = preg_split('/ as /i', $col);
-                                if (isset($arr[1]) && $arr[1] == $found) {
-                                    $found = $arr[0];
-                                    break;
-                                }
-                            }
-                            $countQuery->addSelect($found);
-                        }
+                        $countQuery->addSelect($found);
                     }
                 }
             }
