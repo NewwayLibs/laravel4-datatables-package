@@ -947,6 +947,11 @@ class Datatables
         if (!preg_match('/UNION/i', $countQuery->toSql()) && !$countQuery->havings) {
             $countQuery->select(DB::raw("'1' as row"));
         }
+    
+        // Check soft deleting uses
+        if ($this->usedSoftDeletes()) {
+            $countQuery->whereNull($this->query->getModel()->getTable().'.deleted_at');
+        }
 
         // Clear the orders, since they are not relevant for count
         $countQuery->orders = null;
@@ -1023,6 +1028,24 @@ class Datatables
         } else {
             return Response::json($output);
         }
+    }
+    
+    /**
+     * Check if model use SoftDeletes trait
+     *
+     * @return boolean
+     */
+    protected function usedSoftDeletes()
+    {
+        $app = app();
+        
+        if (strpos($app::VERSION, '5') === 0) {
+            $class = 'Illuminate\Database\Eloquent\SoftDeletes';
+        } else {
+            $class = 'Illuminate\Database\Eloquent\SoftDeletingTrait';
+        }
+        
+        return in_array($class, class_uses($this->query->getModel()));
     }
 
     /**
